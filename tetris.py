@@ -17,6 +17,7 @@ CYAN = (0, 255, 255)
 MAGENTA = (255, 0, 255)
 YELLOW = (255, 255, 0)
 ORANGE = (255, 165, 0)
+BACKGROUND_COLOR = (30, 30, 30)
 
 # Define the grid
 GRID_SIZE = 30
@@ -59,6 +60,8 @@ SPEED_BUTTONS = {
     "FASTER": pygame.Rect(GRID_SIZE * GRID_WIDTH + 110, 380, 70, 30),
 }
 
+PAUSE_BUTTON = pygame.Rect(GRID_SIZE * GRID_WIDTH + 20, 450, 160, 40)
+
 
 class TetrisGame:
     def __init__(self):
@@ -67,12 +70,18 @@ class TetrisGame:
         self.fall_time = 0
         self.key_delay = 200  # Delay in milliseconds
         self.last_key_press_time = pygame.time.get_ticks()
+        self.paused = False
 
     def reset_game(self):
         self.grid = [[False] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
         self.select_new_tetromino()
+        self.next_tetromino = self.get_random_tetromino()
         self.score = 0
         self.game_over = False
+
+    def get_random_tetromino(self):
+        key = random.choice(list(TETROMINOES.keys()))
+        return TETROMINOES[key]
 
     def select_new_tetromino(self):
         self.current_tetromino_key = random.choice(list(TETROMINOES.keys()))
@@ -125,7 +134,7 @@ class TetrisGame:
             self.current_tetromino = rotated
 
     def handle_input(self, x=-1, y=-1, keys=None):
-        if self.game_over:
+        if self.game_over or self.paused:
             return
 
         # Handle mouse clicks on control buttons
@@ -153,6 +162,8 @@ class TetrisGame:
             elif SPEED_BUTTONS["FASTER"].collidepoint(x, y):
                 if self.game_speed < 10:
                     self.game_speed += 1
+            elif PAUSE_BUTTON.collidepoint(x, y):
+                self.paused = not self.paused
 
         # Handle keyboard controls
         if keys:
@@ -178,7 +189,7 @@ class TetrisGame:
                     self.last_key_press_time = current_time
 
     def update(self, dt):
-        if self.game_over:
+        if self.game_over or self.paused:
             return
 
         self.fall_time += dt
@@ -201,7 +212,7 @@ class TetrisGame:
 
     def draw(self):
         # Clear screen
-        screen.fill(BLACK)
+        screen.fill(BACKGROUND_COLOR)
 
         # Draw grid and locked tetrominoes
         for y in range(GRID_HEIGHT):
@@ -227,6 +238,7 @@ class TetrisGame:
         self.draw_buttons()
         self.draw_speed_controls()
         self.draw_score()
+        self.draw_next_tetromino()
 
         if self.game_over:
             return self.draw_game_over_dialog()
@@ -260,17 +272,21 @@ class TetrisGame:
 
     def draw_buttons(self):
         for name, rect in CONTROL_BUTTONS.items():
-            pygame.draw.rect(screen, WHITE, rect)
+            pygame.draw.rect(screen, WHITE, rect, border_radius=5)
             text = FONT_MEDIUM.render(name, True, BLACK)
             screen.blit(text, (rect.x + 20, rect.y + 15))
+
+        pygame.draw.rect(screen, WHITE, PAUSE_BUTTON, border_radius=5)
+        pause_text = FONT_MEDIUM.render("PAUSE", True, BLACK)
+        screen.blit(pause_text, (PAUSE_BUTTON.x + 20, PAUSE_BUTTON.y + 15))
 
     def draw_speed_controls(self):
         text = FONT_SMALL.render("Speed:", True, WHITE)
         screen.blit(text, (GRID_SIZE * GRID_WIDTH + 20, 350))
 
         # Draw speed buttons
-        pygame.draw.rect(screen, WHITE, SPEED_BUTTONS["SLOWER"])
-        pygame.draw.rect(screen, WHITE, SPEED_BUTTONS["FASTER"])
+        pygame.draw.rect(screen, WHITE, SPEED_BUTTONS["SLOWER"], border_radius=5)
+        pygame.draw.rect(screen, WHITE, SPEED_BUTTONS["FASTER"], border_radius=5)
 
         minus_text = FONT_SMALL.render("Slower", True, BLACK)
         plus_text = FONT_SMALL.render("Faster", True, BLACK)
@@ -290,6 +306,35 @@ class TetrisGame:
         text = FONT_MEDIUM.render(f"Score: {self.score}", True, WHITE)
         screen.blit(text, (GRID_SIZE * GRID_WIDTH + 20, 300))
 
+    def draw_next_tetromino(self):
+        text = FONT_MEDIUM.render("Next:", True, WHITE)
+        screen.blit(text, (GRID_SIZE * GRID_WIDTH + 20, 500))
+
+        for i, row in enumerate(self.next_tetromino["shape"]):
+            for j, cell in enumerate(row):
+                if cell:
+                    pygame.draw.rect(
+                        screen,
+                        self.next_tetromino["color"],
+                        (
+                            GRID_SIZE * GRID_WIDTH + 20 + j * GRID_SIZE,
+                            540 + i * GRID_SIZE,
+                            GRID_SIZE,
+                            GRID_SIZE,
+                        ),
+                    )
+                    pygame.draw.rect(
+                        screen,
+                        BLACK,
+                        (
+                            GRID_SIZE * GRID_WIDTH + 20 + j * GRID_SIZE,
+                            540 + i * GRID_SIZE,
+                            GRID_SIZE,
+                            GRID_SIZE,
+                        ),
+                        1,
+                    )
+
     def draw_game_over_dialog(self):
         # Overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -302,10 +347,17 @@ class TetrisGame:
         dialog_y = (SCREEN_HEIGHT - dialog_height) // 2
 
         pygame.draw.rect(
-            screen, WHITE, (dialog_x, dialog_y, dialog_width, dialog_height)
+            screen,
+            WHITE,
+            (dialog_x, dialog_y, dialog_width, dialog_height),
+            border_radius=10,
         )
         pygame.draw.rect(
-            screen, BLACK, (dialog_x, dialog_y, dialog_width, dialog_height), 2
+            screen,
+            BLACK,
+            (dialog_x, dialog_y, dialog_width, dialog_height),
+            2,
+            border_radius=10,
         )
 
         # Game Over text
@@ -326,8 +378,8 @@ class TetrisGame:
         restart_button = pygame.Rect(dialog_x + 30, dialog_y + 130, 100, 40)
         quit_button = pygame.Rect(dialog_x + 170, dialog_y + 130, 100, 40)
 
-        pygame.draw.rect(screen, GREEN, restart_button)
-        pygame.draw.rect(screen, RED, quit_button)
+        pygame.draw.rect(screen, GREEN, restart_button, border_radius=5)
+        pygame.draw.rect(screen, RED, quit_button, border_radius=5)
 
         restart_text = FONT_SMALL.render("Restart", True, BLACK)
         quit_text = FONT_SMALL.render("Quit", True, BLACK)
