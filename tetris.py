@@ -84,12 +84,18 @@ class TetrisGame:
         return TETROMINOES[key]
 
     def select_new_tetromino(self):
-        self.current_tetromino_key = random.choice(list(TETROMINOES.keys()))
+        self.current_tetromino_key = (
+            self.next_tetromino_key
+            if hasattr(self, "next_tetromino_key")
+            else random.choice(list(TETROMINOES.keys()))
+        )
         tetromino_data = TETROMINOES[self.current_tetromino_key]
         self.current_tetromino = tetromino_data["shape"]
         self.current_color = tetromino_data["color"]
         self.offset_x = GRID_WIDTH // 2 - len(self.current_tetromino[0]) // 2
         self.offset_y = 0
+        self.next_tetromino_key = random.choice(list(TETROMINOES.keys()))
+        self.next_tetromino = TETROMINOES[self.next_tetromino_key]
 
     def check_collision(self, tetromino, offset_x, offset_y):
         for i, row in enumerate(tetromino):
@@ -134,7 +140,7 @@ class TetrisGame:
             self.current_tetromino = rotated
 
     def handle_input(self, x=-1, y=-1, keys=None):
-        if self.game_over or self.paused:
+        if self.game_over:
             return
 
         # Handle mouse clicks on control buttons
@@ -168,25 +174,28 @@ class TetrisGame:
         # Handle keyboard controls
         if keys:
             current_time = pygame.time.get_ticks()
-            if current_time - self.last_key_press_time > self.key_delay:
-                if keys[pygame.K_LEFT] and not self.check_collision(
-                    self.current_tetromino, self.offset_x - 1, self.offset_y
-                ):
-                    self.offset_x -= 1
-                    self.last_key_press_time = current_time
-                elif keys[pygame.K_RIGHT] and not self.check_collision(
-                    self.current_tetromino, self.offset_x + 1, self.offset_y
-                ):
-                    self.offset_x += 1
-                    self.last_key_press_time = current_time
-                elif keys[pygame.K_DOWN] and not self.check_collision(
-                    self.current_tetromino, self.offset_x, self.offset_y + 1
-                ):
-                    self.offset_y += 1
-                    self.last_key_press_time = current_time
-                elif keys[pygame.K_r] or keys[pygame.K_UP]:
-                    self.rotate_tetromino()
-                    self.last_key_press_time = current_time
+            if keys[pygame.K_p]:
+                self.paused = not self.paused
+            if not self.paused:
+                if current_time - self.last_key_press_time > self.key_delay:
+                    if keys[pygame.K_LEFT] and not self.check_collision(
+                        self.current_tetromino, self.offset_x - 1, self.offset_y
+                    ):
+                        self.offset_x -= 1
+                        self.last_key_press_time = current_time
+                    elif keys[pygame.K_RIGHT] and not self.check_collision(
+                        self.current_tetromino, self.offset_x + 1, self.offset_y
+                    ):
+                        self.offset_x += 1
+                        self.last_key_press_time = current_time
+                    elif keys[pygame.K_DOWN] and not self.check_collision(
+                        self.current_tetromino, self.offset_x, self.offset_y + 1
+                    ):
+                        self.offset_y += 1
+                        self.last_key_press_time = current_time
+                    elif keys[pygame.K_r] or keys[pygame.K_UP]:
+                        self.rotate_tetromino()
+                        self.last_key_press_time = current_time
 
     def update(self, dt):
         if self.game_over or self.paused:
@@ -271,10 +280,17 @@ class TetrisGame:
                     )
 
     def draw_buttons(self):
+        button_labels = {
+            "LEFT": "LEFT",
+            "RIGHT": "RIGHT",
+            "DOWN": "DOWN",
+            "ROTATE": "ROTATE",
+        }
+
         for name, rect in CONTROL_BUTTONS.items():
             pygame.draw.rect(screen, WHITE, rect, border_radius=5)
-            text = FONT_MEDIUM.render(name, True, BLACK)
-            screen.blit(text, (rect.x + 20, rect.y + 15))
+            text = FONT_MEDIUM.render(button_labels[name], True, BLACK)
+            screen.blit(text, (rect.x + 20, rect.y + 5))
 
         pygame.draw.rect(screen, WHITE, PAUSE_BUTTON, border_radius=5)
         pause_text = FONT_MEDIUM.render("PAUSE", True, BLACK)
